@@ -5,12 +5,12 @@ from streamlit_folium import st_folium
 # page config
 st.set_page_config(page_title="Lower Manhattan Dashboard", layout="wide")
 
-is_mobile = st.checkbox("Mobile view", value=False, key="mobile_toggle",
+is_mobile = st.checkbox("Mobile View", value=False, key="mobile_toggle",
                         help="Toggle if map is not centered correctly")
 
 if is_mobile:
-    center_coords = [40.7074, -74.0030]
-    bounds = [[40.6950, -74.0180],[40.7200, -73.9880]]
+    center_coords = [40.7074, -73.9950]  # Adjusted for mobile - shifted east
+    bounds = [[40.6950, -74.0100], [40.7200, -73.9800]]
 else:
     center_coords = [40.7074, -74.0050]
     bounds = [[40.6950, -74.0200],[40.7200, -73.9900]]
