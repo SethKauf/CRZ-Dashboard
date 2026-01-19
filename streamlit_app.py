@@ -25,7 +25,7 @@ tiles_dict = {
 # Center map on Lower Manhattan
 # Coordinates are approximately where City Hall is
 m = folium.Map(
-    location=[40.7074, -73.0113],
+    location=[40.7074, -74.0060],
     zoom_start=13,
     tiles=tiles_dict[map_style],
     prefer_canvas=True,
@@ -33,7 +33,7 @@ m = folium.Map(
 )
 
 # force the map to center on load
-m.fit_bounds([[40.7000,-74.0200], [40.7150, -74.0000]])
+m.fit_bounds([[40.7000, -74.0180], [40.7150, -73.9980]])
 
 
 # notable locations
