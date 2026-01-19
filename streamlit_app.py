@@ -10,7 +10,7 @@ is_mobile = st.checkbox("Mobile View", value=False, key="mobile_toggle",
 
 if is_mobile:
     center_coords = [40.7074, -73.9800]  # Adjusted for mobile - shifted east
-    bounds = [[40.6950, -73.9950], [40.7200, -73.9250]]
+    bounds = [[40.6950, -73.9950], [40.7200, -73.9450]]
 else:
     center_coords = [40.7074, -74.0050]
     bounds = [[40.6950, -74.0200],[40.7200, -73.9900]]
