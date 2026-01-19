@@ -5,6 +5,16 @@ from streamlit_folium import st_folium
 # page config
 st.set_page_config(page_title="Lower Manhattan Dashboard", layout="wide")
 
+is_mobile = st.checkbox("Mobile view", value=False, key="mobile_toggle",
+                        help="Toggle if map is not centered correctly")
+
+if is_mobile:
+    center_coords = [40.7074, -74.0030]
+    bounds = [[40.6950, -74.0180],[40.7200, -73.9880]]
+else:
+    center_coords = [40.7074, -74.0050]
+    bounds = [[40.6950, -74.0200],[40.7200, -73.9900]]
+
 # title
 st.title("Lower Manhattan Interactive Map")
 
@@ -25,7 +35,7 @@ tiles_dict = {
 # Center map on Lower Manhattan
 # Coordinates are approximately where City Hall is
 m = folium.Map(
-    location=[40.7074, -74.0050],
+    location=center_coords,
     zoom_start=8,
     tiles=tiles_dict[map_style],
     prefer_canvas=True,
@@ -33,7 +43,7 @@ m = folium.Map(
 )
 
 # force the map to center on load
-m.fit_bounds([[40.6950, -74.0200], [40.7200, -73.9900]])
+m.fit_bounds(bounds)
 
 
 # notable locations
@@ -54,7 +64,7 @@ for name, coords in locations.items():
     ).add_to(m)
 
 # display map
-st_folium(m, width=1200, height=600)
+st_folium(m, width=1200, height=600, returned_objects=[])
 
 # additional info
 st.sidebar.markdown("---")
