@@ -12,23 +12,29 @@ st.title("Lower Manhattan Interactive Map")
 st.sidebar.header("Map Controls")
 map_style = st.sidebar.selectbox(
     "Select Map Style",
-    ["CartoDB Light Mode", "CartoDB Dark Mode", "OpenStreetMap"]
+    ["Light Mode", "Dark Mode", "OpenStreetMap"]
 )
 
 # Map style tiles
 tiles_dict = {
     "OpenStreetMap": "OpenStreetMap",
-    "CartoDB Light Mode": "CartoDB Positron",
-    "CartoDB Dark Mode": "CartoDB Dark_Matter"
+    "Light Mode": "CartoDB Positron",
+    "Dark Mode": "CartoDB Dark_Matter"
 }
 
 # Center map on Lower Manhattan
 # Coordinates are approximately where City Hall is
 m = folium.Map(
-    location=[40.7100, -73.9800],
+    location=[40.7074, -73.0113],
     zoom_start=13,
-    tiles=tiles_dict[map_style]
+    tiles=tiles_dict[map_style],
+    prefer_canvas=True,
+    control_scale=True
 )
+
+# force the map to center on load
+m.fit_bounds([[40.7000,-74.0200], [40.7150, -74.0000]])
+
 
 # notable locations
 locations = {
