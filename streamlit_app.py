@@ -9,8 +9,8 @@ is_mobile = st.checkbox("Mobile View", value=False, key="mobile_toggle",
                         help="Toggle if map is not centered correctly")
 
 if is_mobile:
-    center_coords = [40.7074, -73.9950]  # Adjusted for mobile - shifted east
-    bounds = [[40.6950, -74.0100], [40.7200, -73.9800]]
+    center_coords = [40.7074, -73.9800]  # Adjusted for mobile - shifted east
+    bounds = [[40.6950, -73.9950], [40.7200, -73.9650]]
 else:
     center_coords = [40.7074, -74.0050]
     bounds = [[40.6950, -74.0200],[40.7200, -73.9900]]
