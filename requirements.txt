@@ -27,11 +27,13 @@ pytz==2025.2
 referencing==0.37.0
 requests==2.32.5
 rpds-py==0.30.0
+scikit-learn>=1.4.0
 six==1.17.0
 smmap==5.0.2
 streamlit==1.53.0
 streamlit-folium==0.26.1
 tenacity==9.1.2
+tensorflow>=2.15.0
 toml==0.10.2
 tornado==6.5.4
 typing_extensions==4.15.0

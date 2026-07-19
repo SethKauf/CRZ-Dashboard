@@ -1,6 +1,7 @@
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
+from lstm_model import run_model_pipeline
 
 # page config
 st.set_page_config(page_title="Lower Manhattan Dashboard", layout="wide")
@@ -25,6 +26,33 @@ map_style = st.sidebar.selectbox(
     ["Light Mode", "Dark Mode", "OpenStreetMap"]
 )
 
+# Select detection region on sidebar
+detection_region = st.sidebar.selectbox(
+    "Select Detection Region",
+    ["All Regions", "Brooklyn", "Manhattan", "Queens", "The Bronx", "Staten Island"]
+)
+
+region_param = None if detection_region == "All Regions" else detection_region
+
+if st.sidebar.button("Train LSTM Model"):
+    with st.spinner("Training Model..."):
+        model, scaler, data, metrics, predictions = run_model_pipeline(region_param)
+
+        # Display metrics
+        col1, col2 = st.columns(2)
+        col1.metric("RMSE % of Mean: ", f"{metrics['rmse_pct']:.2f}%")
+        col2.metric("MAE % of Mean: ", f"{metrics['mae_pct']:.2f}%")
+
+        # Plot predictions
+        fig, ax = plt.subplots(figsize=(12, 5))
+        ax.plot(predictions['actual'][:500], label="Actual", color="#F1948A", linewidth=2)
+        ax.plot(predictions['predicted'][:500], label="Predicted", color="#85C1E9", linewidth=2, linestyle="--")
+        ax.set_title("LSTM 1-step Forecast (first 500 validation points)")
+        ax.set_xlabel("Validation index")
+        ax.set_ylabel("Traffic volume")
+        ax.legend()
+        st.pyplot(fig)
+
 # Map style tiles
 tiles_dict = {
     "OpenStreetMap": "OpenStreetMap",
@@ -36,7 +64,7 @@ tiles_dict = {
 # Coordinates are approximately where City Hall is
 m = folium.Map(
     location=center_coords,
-    zoom_start=8,
+    zoom_start=5,
     tiles=tiles_dict[map_style],
     prefer_canvas=True,
     control_scale=True
