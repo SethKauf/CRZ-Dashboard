@@ -1,7 +1,7 @@
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
-from lstm_model import run_model_pipeline
+from model_utils.lstm_model import run_model_pipeline
 
 # page config
 st.set_page_config(page_title="Lower Manhattan Dashboard", layout="wide")
