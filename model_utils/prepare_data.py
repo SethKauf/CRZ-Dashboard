@@ -114,3 +114,45 @@ def make_sequences(arr_2d, lookback=48):
         y[i] = arr_2d[i + lookback]
 
     return X, y
+
+def load_traffic_data_from_db():
+    """
+    Loads all traffic data from MongoDB
+    """
+    print("Connecting to MongoDB...")
+
+    try:
+        client = MongoClient(MONGO_CONNECTION_STRING)
+        db = client['CRZ']
+        collection = db['traffic_data']
+
+        count = collection.count_documents({})
+        print(f"Loading {count} rows from MongoDB...")
+
+        data = list(collection.find({}, {'_id':0}))
+        df_all = pd.DataFrame(data)
+
+        client.close()
+        print("Data succesfully loaded.")
+
+
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {e}")
+        return None
+    
+    return df_all
+
+if __name__ == "__main__":
+    print("=" * 80)
+    print("FETCHING FROM API & STORING IN MONGODB")
+    print("=" * 80)
+    df_all = fetch_traffic_data_from_api()
+    print(f"\nDataframe shape: {df_all.shape}")
+    print(f"Date range: {df_all['toll_day'].min()} to {df_all['toll_day'].max()}")
+
+    print("\n" + "=" * 80)
+    print("LOADING FROM MONGODB")
+    print("=" * 80)
+    df_loaded = load_traffic_data_from_db()
+    print(f"\nDataframe shape: {df_loaded.shape}")
+    print(f"Date range: {df_loaded['toll_day'].min()} to {df_loaded['toll_day'].max()}")
