@@ -6,6 +6,10 @@
 
 .env
 
+*.keras
+
+*.joblib
+
 .streamlit/secrets.toml
 
 # Byte-compiled / optimized / DLL files
