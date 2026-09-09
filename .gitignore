@@ -8,6 +8,10 @@
 
 .streamlit/secrets.toml
 
+*.keras
+
+*.joblib
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
