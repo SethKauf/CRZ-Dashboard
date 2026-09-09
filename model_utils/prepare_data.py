@@ -1,158 +1,42 @@
-import requests
 import pandas as pd
 import numpy as np
-import holidays
 from datetime import datetime, timedelta
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras.optimizers import Adam
-import matplotlib.pyplot as plt
 
+from src.fetch_data import fetch_traffic_data, process_data
 
+CURRENT_DATA_PATH = "data/modeling_data.csv"
 
-def fetch_traffic_data():
-    """
-    Fetches all CRZ Traffic Data from NY Gov API in chunks
-    """
+current_data = pd.read_csv(CURRENT_DATA_PATH,index_col=None)
 
-    url = "https://data.ny.gov/resource/t6yz-b64h.json"
+# convert timestamp to datetime
+current_data['toll_10_minute_block'] = pd.to_datetime(current_data['toll_10_minute_block'])
 
-    chunk_size = 50000
+# pull new data
+new_data = fetch_traffic_data(CURRENT_DATA_PATH,full_pull=False)
 
-    chunks = []
+# save data append pull
+todays_date = datetime.today().strftime("%Y%m%d")
 
-    offset = 0
+new_data.to_csv(f"data/api_pull_data/crz_data_pull_{todays_date}.csv",index=False)
 
-    while True:
-        print(f"Fetching rows {offset + 1}-{offset+chunk_size} ...")
+# process data to match previous format
+append_data = process_data(new_data)
 
-        params = {
-            "$limit": chunk_size,
-            "$offset": offset
-        }
+# All columns from toll_date through detection_region
+key_cols = append_data.columns[
+    append_data.columns.get_loc("toll_10_minute_block"):
+    append_data.columns.get_loc("traffic_volume") + 1
+].tolist()
 
-        response = requests.get(url,params=params)
+# append data supercedes current
+data = (
+    pd.concat([append_data, current_data], ignore_index=True)
+      .drop_duplicates(subset=key_cols, keep="last")
+      .reset_index(drop=True)
+)
 
-        data = response.json()
+data.to_csv(CURRENT_DATA_PATH,index=False)
 
-        if len(data)==0:
-
-            print("No more data to fetch.")
-            break
-
-        chunks.append(pd.DataFrame(data))
-        offset += chunk_size
-
-    df_all = pd.concat(chunks, ignore_index=True)
-
-    return df_all
-
-# ============================================================= #
-###################### DATA PREPROCESSING #######################
-# ============================================================= #
-
-def prepare_data(df, detection_region=None):
-    """
-    Prepare data for LSTM modeling
-
-    Parameters:
-    - df_all: full dataframe
-    - detection_region: specific region or None for all regions
-
-    Returns:
-    - data: aggregated timeseries dataframe
-    """
-
-    # Convert date columns
-    df['toll_date'] = pd.to_datetime(df['toll_date'])
-    df['hour_of_day'] = pd.to_numeric(df['hour_of_day'])
-    df['minute_of_hour'] = pd.to_numeric(df['minute_of_hour'])
-    df['crz_entries'] = pd.to_numeric(df['crz_entries'])
-
-
-    highest_day = df['toll_date'].max()
-
-    removal_date = highest_day - timedelta(days=14)
-
-    # Filter data
-    data = df[df['toll_date'] <= removal_date].copy()
-
-    if detection_region:
-        data = data[data['detection_region'] == detection_region]
-
-    # Select relevant columns and group
-    data = data[['toll_date','hour_of_day', 'minute_of_hour', 'crz_entries']].copy()
-
-    # First aggregation: Group by time components
-    data = data.groupby(['toll_date',' hour_of_day', 'minute_of_hour']).agg(
-        {'crz_entries':'sum'}
-    ).reset_index()
-
-    data = data.sort_values('toll_10_minute_block').reset_index(drop=True)
-
-    return data
-
-# ============================================================= #
-############### LSTM SEQUENCES & MODEL TRAINING #################
-# ============================================================= #
-
-def make_sequences(arr_2d, lookback=48):
-    """
-    Create sequences for LSTM
-    """
-    n = arr_2d.shape[0]
-
-    X = np.zeros((n - lookback, lookback, arr_2d.shape[1]), dtype=np.float32)
-    
-    y = np.zeros((n - lookback, arr_2d.shape[1]), dtype=np.float32)
-
-    for i in range(n - lookback):
-
-        X[i] = arr_2d[i:i + lookback]
-        
-        y[i] = arr_2d[i + lookback]
-
-    return X, y
-
-def load_traffic_data_from_db():
-    """
-    Loads all traffic data from MongoDB
-    """
-    print("Connecting to MongoDB...")
-
-    try:
-        client = MongoClient(MONGO_CONNECTION_STRING)
-        db = client['CRZ']
-        collection = db['traffic_data']
-
-        count = collection.count_documents({})
-        print(f"Loading {count} rows from MongoDB...")
-
-        data = list(collection.find({}, {'_id':0}))
-        df_all = pd.DataFrame(data)
-
-        client.close()
-        print("Data succesfully loaded.")
-
-
-    except Exception as e:
-        print(f"Error connecting to MongoDB: {e}")
-        return None
-    
-    return df_all
-
-if __name__ == "__main__":
-    print("=" * 80)
-    print("FETCHING FROM API & STORING IN MONGODB")
-    print("=" * 80)
-    df_all = fetch_traffic_data_from_api()
-    print(f"\nDataframe shape: {df_all.shape}")
-    print(f"Date range: {df_all['toll_day'].min()} to {df_all['toll_day'].max()}")
-
-    print("\n" + "=" * 80)
-    print("LOADING FROM MONGODB")
-    print("=" * 80)
-    df_loaded = load_traffic_data_from_db()
-    print(f"\nDataframe shape: {df_loaded.shape}")
-    print(f"Date range: {df_loaded['toll_day'].min()} to {df_loaded['toll_day'].max()}")
+print(f"""
+Saved new modeling data with min timestamp of {data['toll_10_minute_block'].min()} and max timestamp of {data['toll_10_minute_block'].max()}.
+""")
