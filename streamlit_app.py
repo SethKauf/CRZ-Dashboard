@@ -140,7 +140,7 @@ map_style = st.sidebar.selectbox(
 
 
 # --------------------------
-# Forecast date
+# Forecast date / time
 # --------------------------
 
 # Current NYC time
@@ -160,6 +160,11 @@ next_interval = (
 default_date = next_interval.date()
 default_time = next_interval.strftime("%H:%M")
 
+
+# --------------------------
+# Forecast date
+# --------------------------
+
 available_dates = sorted(
     forecast["forecast_date"].unique()
 )
@@ -176,6 +181,11 @@ selected_date = st.sidebar.selectbox(
     available_dates,
     index=default_date_index
 )
+
+
+# --------------------------
+# Forecast time
+# --------------------------
 
 available_times = sorted(
     forecast.loc[
@@ -198,14 +208,6 @@ selected_time = st.sidebar.selectbox(
     "Forecast Time",
     available_times,
     index=default_time_index
-)
-available_dates = sorted(
-    forecast["forecast_date"].unique()
-)
-
-selected_date = st.sidebar.selectbox(
-    "Forecast Date",
-    available_dates
 )
 
 # --------------------------
