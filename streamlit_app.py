@@ -77,15 +77,20 @@ GROUP_COORDS = {
 # LOAD FORECAST DATA
 # ============================================================
 
-@st.cache_data
+@st.cache_data(ttl=300)
 def load_forecast_data():
 
     df = pd.read_csv(
-        FORECAST_PATH
+        "data/forecasts/traffic_forecast.csv"
     )
 
     df["toll_10_minute_block"] = pd.to_datetime(
         df["toll_10_minute_block"]
+    )
+
+    df["predicted_volume_rounded"] = (
+        df["predicted_volume_rounded"]
+        .astype(int)
     )
 
     df["forecast_date"] = (
@@ -285,23 +290,22 @@ st.subheader(
 if not current_forecast.empty:
 
     total_volume = (
-        current_forecast["predicted_volume"]
+        current_forecast["predicted_volume_rounded"]
         .sum()
     )
 
     avg_volume = (
-        current_forecast["predicted_volume"]
+        current_forecast["predicted_volume_rounded"]
         .mean()
     )
 
     busiest_row = (
         current_forecast.loc[
             current_forecast[
-                "predicted_volume"
+                "predicted_volume_rounded"
             ].idxmax()
         ]
     )
-
 
     col1, col2, col3 = st.columns(3)
 
@@ -319,7 +323,7 @@ if not current_forecast.empty:
         "Highest Volume",
         (
             f"{busiest_row['group_name']} "
-            f"({busiest_row['predicted_volume']:,.0f})"
+            f"({busiest_row['predicted_volume_rounded']:,.0f})"
         )
     )
 
@@ -408,7 +412,7 @@ for _, row in current_forecast.iterrows():
     ]
 
     predicted_volume = row[
-        "predicted_volume"
+        "predicted_volume_rounded"
     ]
 
 
@@ -482,7 +486,7 @@ display_table = (
         [
             "group_name",
             "region_name",
-            "predicted_volume"
+            "predicted_volume_rounded"
         ]
     ]
     .rename(
@@ -493,7 +497,7 @@ display_table = (
             "region_name":
                 "Region",
 
-            "predicted_volume":
+            "predicted_volume_rounded":
                 "Predicted Volume"
         }
     )
