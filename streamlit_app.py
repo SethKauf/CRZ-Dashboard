@@ -208,26 +208,6 @@ selected_date = st.sidebar.selectbox(
     available_dates
 )
 
-
-# --------------------------
-# Forecast time
-# --------------------------
-
-available_times = sorted(
-    forecast.loc[
-        forecast["forecast_date"] == selected_date,
-        "forecast_time"
-    ]
-    .unique()
-)
-
-selected_time = st.sidebar.selectbox(
-    "Forecast Time",
-    available_times,
-    index=0
-)
-
-
 # --------------------------
 # Region
 # --------------------------
