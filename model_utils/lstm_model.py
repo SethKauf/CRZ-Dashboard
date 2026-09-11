@@ -1,129 +1,309 @@
-import requests
+import json
+import shutil
+
+import joblib
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+import tensorflow as tf
+
+from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
-import matplotlib.pyplot as plt
 
-# ============================================================= #
-######################### DATA FETCHING #########################
-# ============================================================= #
+from src.model_functions import (
+    make_update_group_dataset,
+    format_for_model
+)
 
 
+# ============================================================
+# PATHS
+# ============================================================
 
-def train_lstm_model(X_train, y_train, X_val, y_val, epochs=50):
-    """
-    Build and train LSTM model
-    """
-    model = Sequential([
-        LSTM(64, activation='relu', input_shape=(X_train.shape[1], X_train.shape[2]),
-             return_sequences=True),
-        Dropout(0.2),
-        LSTM(32, activation='relu'),
-    Dropout(0.2),
-    Dense(1)
-    ])
+DATA_PATH = "data/modeling_data.csv"
+MODEL_PATH = "models/lstm_traffic_model.keras"
+SCALER_PATH = "models/traffic_scaler.joblib"
+CONFIG_PATH = "src/model_config.json"
 
-    model.compile(optimizer=Adam(learning_rate=0.001), loss='mse', metrics=['mae'])
 
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val,y_val),
-        epochs=epochs,
-        batch_size=32,
-        verbose=0
+# ============================================================
+# MODEL FEATURES
+# ============================================================
+
+numeric_features = [
+    "traffic_scaled",
+    "holiday_ind",
+    "overnight_ind",
+    "dow_sin",
+    "dow_cos"
+]
+
+
+# ============================================================
+# LOAD MODEL CONFIG
+# ============================================================
+
+with open(CONFIG_PATH, "r") as f:
+    config = json.load(f)
+
+
+LAST_TRAINED_TIMESTAMP = pd.Timestamp(
+    config["last_trained_timestamp"]
+)
+
+SEQ_LENGTH = config["seq_length"]
+BATCH_SIZE = config["batch_size"]
+
+
+new_data_start = (
+    LAST_TRAINED_TIMESTAMP
+    + pd.Timedelta(minutes=10)
+)
+
+
+print(
+    "\nModel last trained through:",
+    LAST_TRAINED_TIMESTAMP
+)
+
+print(
+    "\nNew training data starts:",
+    new_data_start
+)
+
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
+data = pd.read_csv(
+    DATA_PATH
+)
+
+data["toll_10_minute_block"] = pd.to_datetime(
+    data["toll_10_minute_block"]
+)
+
+data = (
+    data
+    .sort_values(
+        [
+            "group_id",
+            "toll_10_minute_block"
+        ]
+    )
+    .reset_index(drop=True)
+)
+
+
+# ============================================================
+# DETERMINE LATEST COMMON TIMESTAMP
+# ============================================================
+
+latest_common_timestamp = (
+    data
+    .groupby("group_id")[
+        "toll_10_minute_block"
+    ]
+    .max()
+    .min()
+)
+
+
+print(
+    "\nLatest common data timestamp:",
+    latest_common_timestamp
+)
+
+
+# Exit cleanly if there is nothing new
+if latest_common_timestamp < new_data_start:
+
+    print(
+        "\nNo new data available. "
+        "\nModel update not required."
     )
 
-    return model, history
+    raise SystemExit
 
-def predict_and_evaluate(model, X_val, y_val, scaler):
-    """
-    Make predictions and calculate metrics
-    """
-    y_pred_scaled = model.predict(X_val, verbose=0)
 
-    # Inverse transform to original scaling
-    y_val_orig = scaler.inverse_transform(y_val.reshape(-1,1)).flatten()
+# Only train through the latest timestamp
+# shared by every group.
+data = data[
+    data["toll_10_minute_block"]
+    <= latest_common_timestamp
+].copy()
 
-    y_pred_orig = scaler.inverse_transform(y_pred_scaled).flatten()
 
-    # Calcualte metrics
+# ============================================================
+# LOAD MODEL + SCALER
+# ============================================================
 
-    rmse = np.sqrt(np.mean((y_val_orig - y_pred_orig) ** 2))
+model = load_model(
+    MODEL_PATH,
+    compile=False
+)
 
-    mae = np.mean(np.abs(y_val_orig - y_pred_orig))
+traffic_scaler = joblib.load(
+    SCALER_PATH
+)
 
-    mean_volume = y_val_orig.mean()
 
-    rmse_pct = (rmse / mean_volume) * 100
+# ============================================================
+# ARCHIVE CURRENT MODEL
+# ============================================================
 
-    mae_pct = (mae / mean_volume) * 100
+archive_date = (
+    LAST_TRAINED_TIMESTAMP
+    .strftime("%Y%m%d")
+)
 
-    return y_val_orig, y_pred_orig, rmse_pct, mae_pct
+model_archive_ref = (
+    f"models/"
+    f"trained_model_{archive_date}.keras"
+)
 
-# ============================================================= #
-########################### PIPELINE ############################
-# ============================================================= #
+shutil.copy2(
+    MODEL_PATH,
+    model_archive_ref
+)
 
-def run_model_pipeline(detection_region=None):
-    """
-    Run complete LSTM pipeline for a given detection region.
+print(
+    "\nArchived existing model to:",
+    model_archive_ref
+)
 
-    Parameters:
-    - detection_region: specific region (e.g., 'Brooklyn') or None for all regions
 
-    Returns:
-    - model: trained Keras LSTM model
-    - scaler: fitted MinMaxScaler
-    - data: prepared Time series data
-    - metrics: dictionary with RMSE % and MAE %
-    - predictions: dict with actual and predicted values
-    """
+# ============================================================
+# APPLY EXISTING SCALER
+# ============================================================
 
-    # Fetch and prepare data
-    df_all = fetch_traffic_data()
+# IMPORTANT:
+# transform only -- never refit the scaler here.
 
-    print(f"Preparing data for {detection_region if detection_region else 'all regions'}...")
-    
-    data = prepare_data(df_all, detection_region)
+data["traffic_scaled"] = (
+    traffic_scaler
+    .transform(
+        data[["traffic_volume"]]
+    )
+    .ravel()
+)
 
-    # Scale data
-    scaler = MinMaxScaler()
 
-    y_scaled = scaler.fit_transform(data[['traffic_volume']].values)
+# ============================================================
+# BUILD UPDATE DATASET
+# ============================================================
 
-    # Create sequences
-    LOOKBACK = 48 # 48 half-hours = 24 hours
-    X, y = make_sequences(y_scaled, LOOKBACK)
+update_ds = None
 
-    # Train/val split (80/20)
-    split = int(0.8 * len(X))
 
-    X_train, X_val = X[:split], X[split:]
-    y_train, y_val = y[:split], y[split:]
+for group_id, group_df in data.groupby(
+    "group_id"
+):
 
-    # Train model
-    print('Training LSTM Model...')
-    
-    model, history = train_lstm_model(X_train, y_train, X_val, y_val, epochs=50)
-
-    # Evaluate
-    y_val_orig, y_pred_orig, rmse_pct, mae_pct = predict_and_evaluate(
-        model, X_val, y_val, scaler
+    group_ds = make_update_group_dataset(
+        group_df=group_df,
+        numeric_features=numeric_features,
+        new_data_start=new_data_start,
+        seq_length=SEQ_LENGTH
     )
 
-    metrics = {
-        'rmse_pct':rmse_pct,
-        'mae_pct':mae_pct,
-        'mean_volume':y_val_orig.mean()
-    }
+    # Group has no genuinely new observations
+    if group_ds is None:
+        continue
 
-    predictions = {
-        'actual':y_val_orig,
-        'predicted':y_pred_orig
-    }
+    if update_ds is None:
+        update_ds = group_ds
 
-    return model, scaler, data, metrics, predictions
+    else:
+        update_ds = (
+            update_ds
+            .concatenate(group_ds)
+        )
+
+
+if update_ds is None:
+    print(
+        "No new training sequences found."
+    )
+    raise SystemExit
+
+
+# ============================================================
+# BATCH DATASET
+# ============================================================
+
+update_ds = (
+    update_ds
+    .shuffle(20_000)
+    .batch(BATCH_SIZE)
+    .map(
+        format_for_model,
+        num_parallel_calls=tf.data.AUTOTUNE
+    )
+    .prefetch(
+        tf.data.AUTOTUNE
+    )
+)
+
+
+# ============================================================
+# COMPILE FOR FINE-TUNING
+# ============================================================
+
+model.compile(
+    optimizer=Adam(
+        learning_rate=0.0001
+    ),
+    loss="mse",
+    metrics=["mae"]
+)
+
+
+# ============================================================
+# UPDATE MODEL
+# ============================================================
+
+history = model.fit(
+    update_ds,
+    epochs=3
+)
+
+
+# ============================================================
+# SAVE UPDATED MODEL
+# ============================================================
+
+model.save(
+    MODEL_PATH
+)
+
+print(
+    "Updated model saved to:",
+    MODEL_PATH
+)
+
+
+# ============================================================
+# UPDATE MODEL CONFIG
+# ============================================================
+
+# Only happens AFTER model.save() succeeds.
+
+config["last_trained_timestamp"] = (
+    latest_common_timestamp
+    .isoformat()
+)
+
+
+with open(CONFIG_PATH, "w") as f:
+
+    json.dump(
+        config,
+        f,
+        indent=4
+    )
+
+
+print(
+    "Model now trained through:",
+    latest_common_timestamp
+)
