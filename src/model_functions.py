@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 
-
+# create dataset for updated/new data
 def make_update_group_dataset(
     group_df,
     numeric_features,
@@ -108,7 +108,7 @@ def make_update_group_dataset(
         )
     )
 
-
+# format data for the model
 def format_for_model(
     numeric,
     region,
@@ -120,3 +120,38 @@ def format_for_model(
         "region": region,
         "group": group
     }, target
+
+# create features for future data
+def create_future_features(timestamp, us_holidays, overnight_lookup):
+
+    day_of_week_int = (
+        timestamp.dayofweek + 1
+    )
+
+    clock_time = timestamp.strftime(
+        "%H:%M"
+    )
+
+    holiday_ind = int(
+        timestamp.date() in us_holidays
+    )
+
+    overnight_ind = int(
+        overnight_lookup[clock_time]
+    )
+
+    dow_sin = np.sin(
+        2 * np.pi * day_of_week_int / 7
+    )
+
+    dow_cos = np.cos(
+        2 * np.pi * day_of_week_int / 7
+    )
+
+    return {
+        "toll_10_minute_block": timestamp,
+        "holiday_ind":holiday_ind,
+        "overnight_ind":overnight_ind,
+        "dow_sin":dow_sin,
+        "dow_cos":dow_cos
+    }

@@ -5,3 +5,6 @@ Run data pull from main directory with `python -m model_utils.prepare_data` to u
 
 # Update Model
 Run `python -m model_utils.lstm_model` to update the model with the new data.
+
+# Generate Forecasts
+Run `python - model_utils.generate_forecast` to generate a 2-week traffic forecast.
