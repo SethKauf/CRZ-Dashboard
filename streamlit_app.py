@@ -2,6 +2,8 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import pandas as pd
 
 from src.mappings import (
@@ -20,6 +22,8 @@ st.set_page_config(
     layout="wide"
 )
 
+# CARTO API key
+CARTO_API_KEY = st.secrets["CARTO_API_KEY"]
 
 # ============================================================
 # PATHS
@@ -138,6 +142,23 @@ map_style = st.sidebar.selectbox(
 # --------------------------
 # Forecast date
 # --------------------------
+
+# Current NYC time
+now = datetime.now(
+    ZoneInfo("America/New_York")
+)
+
+# Next 10-minute interval
+minutes_to_add = 10 - (now.minute % 10)
+
+next_interval = (
+    now
+    .replace(second=0, microsecond=0)
+    + timedelta(minutes=minutes_to_add)
+)
+
+default_date = next_interval.date()
+default_time = next_interval.strftime("%H:%M")
 
 available_dates = sorted(
     forecast["forecast_date"].unique()
@@ -288,8 +309,18 @@ if not current_forecast.empty:
 
 tiles_dict = {
     "OpenStreetMap": "OpenStreetMap",
-    "Light Mode": "CartoDB Positron",
-    "Dark Mode": "CartoDB Dark_Matter"
+
+    "Light Mode": (
+        "https://basemaps.cartocdn.com/"
+        "rastertiles/light_all/{z}/{x}/{y}.png"
+        f"?key={CARTO_API_KEY}"
+    ),
+
+    "Dark Mode": (
+        "https://basemaps.cartocdn.com/"
+        "rastertiles/dark_all/{z}/{x}/{y}.png"
+        f"?key={CARTO_API_KEY}"
+    )
 }
 
 
@@ -312,6 +343,7 @@ m = folium.Map(
     location=center_coords,
     zoom_start=12,
     tiles=tiles_dict[map_style],
+    attr="© OpenStreetMap contributors © CARTO",
     prefer_canvas=True,
     control_scale=True
 )
