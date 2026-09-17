@@ -5,6 +5,9 @@ from streamlit_folium import st_folium
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import pandas as pd
+import numpy as np
+
+import altair as alt
 
 from src.mappings import (
     REGION_MAPPING,
@@ -76,7 +79,7 @@ GROUP_COORDS = {
 # ============================================================
 # LOAD FORECAST DATA
 # ============================================================
-
+# cache streamlit functions
 @st.cache_data(ttl=300)
 def load_forecast_data():
 
@@ -103,9 +106,56 @@ def load_forecast_data():
 
     return df
 
+@st.cache_data(ttl=300)
+def load_evaluation_data():
+
+    df = pd.read_csv(
+        "data/forecast_evaluations/"
+        "forecast_actual_comparison.csv"
+    )
+
+    df['toll_10_minute_block'] = pd.to_datetime(
+        df['toll_10_minute_block']
+    )
+
+    df['forecast_generated_date_display'] = (
+        pd.to_datetime(
+            df['forecast_generated_date'].astype(str),
+            format="%Y%m%d"
+        )
+        .dt.strftime("%Y-%b-%d")
+    )
+
+    return df
+
+@st.cache_data(ttl=300)
+def load_group_evaluation():
+
+    df = pd.read_csv(
+        "data/forecast_evaluations/"
+        "evaluation_by_group.csv"
+    )
+
+    df['group_name'] = (
+        df['group_id']
+        .map(GROUP_NAME_BY_ID)
+    )
+
+    df['forecast_generated_date_display'] = (
+        pd.to_datetime(
+            df['forecast_generated_date'].astype(str),
+            format="%Y%m%d"
+        )
+        .dt.strftime("%Y-%b-%d")
+    )
+
+    return df
 
 forecast = load_forecast_data()
 
+evaluation = load_evaluation_data()
+
+group_performance = load_group_evaluation()
 
 # ============================================================
 # TITLE
@@ -140,7 +190,8 @@ map_style = st.sidebar.selectbox(
         "Light Mode",
         "Dark Mode",
         "OpenStreetMap"
-    ]
+    ],
+    accept_new_options=False
 )
 
 
@@ -184,7 +235,8 @@ else:
 selected_date = st.sidebar.selectbox(
     "Forecast Date",
     available_dates,
-    index=default_date_index
+    index=default_date_index,
+    accept_new_options=False
 )
 
 
@@ -212,7 +264,8 @@ else:
 selected_time = st.sidebar.selectbox(
     "Forecast Time",
     available_times,
-    index=default_time_index
+    index=default_time_index,
+    accept_new_options=False
 )
 
 # --------------------------
@@ -226,7 +279,8 @@ region_options = [
 
 selected_region = st.sidebar.selectbox(
     "Detection Region",
-    region_options
+    region_options,
+    accept_new_options=False
 )
 
 
@@ -275,301 +329,566 @@ if selected_region != "All Regions":
         == selected_region
     ]
 
-
-# ============================================================
-# SUMMARY
-# ============================================================
-
-st.subheader(
-    selected_timestamp.strftime(
-        "%A, %B %d, %Y at %I:%M %p"
-    )
+# Dashboard Tabs
+forecast_tab, performance_tab = st.tabs(
+    [
+        "Traffic Forecast",
+        "Model Performance"
+    ]
 )
 
+with forecast_tab:
+    # ============================================================
+    # SUMMARY
+    # ============================================================
 
-if not current_forecast.empty:
-
-    total_volume = (
-        current_forecast["predicted_volume_rounded"]
-        .sum()
-    )
-
-    avg_volume = (
-        current_forecast["predicted_volume_rounded"]
-        .mean()
-    )
-
-    busiest_row = (
-        current_forecast.loc[
-            current_forecast[
-                "predicted_volume_rounded"
-            ].idxmax()
-        ]
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Total Predicted Volume",
-        f"{total_volume:,.0f}"
-    )
-
-    col2.metric(
-        "Average per Entry Point",
-        f"{avg_volume:,.0f}"
-    )
-
-    col3.metric(
-        "Highest Volume",
-        (
-            f"{busiest_row['group_name']} "
-            f"({busiest_row['predicted_volume_rounded']:,.0f})"
+    st.subheader(
+        selected_timestamp.strftime(
+            "%A, %B %d, %Y at %I:%M %p"
         )
     )
 
 
-# ============================================================
-# MAP CONFIGURATION
-# ============================================================
+    if not current_forecast.empty:
 
-tiles_dict = {
-    "OpenStreetMap": "OpenStreetMap",
+        total_volume = (
+            current_forecast["predicted_volume_rounded"]
+            .sum()
+        )
 
-    "Light Mode": (
-        "https://basemaps.cartocdn.com/"
-        "rastertiles/light_all/{z}/{x}/{y}.png"
-        f"?key={CARTO_API_KEY}"
-    ),
+        avg_volume = (
+            current_forecast["predicted_volume_rounded"]
+            .mean()
+        )
 
-    "Dark Mode": (
-        "https://basemaps.cartocdn.com/"
-        "rastertiles/dark_all/{z}/{x}/{y}.png"
-        f"?key={CARTO_API_KEY}"
-    )
-}
+        busiest_row = (
+            current_forecast.loc[
+                current_forecast[
+                    "predicted_volume_rounded"
+                ].idxmax()
+            ]
+        )
 
+        col1, col2, col3 = st.columns(3)
 
-if is_mobile:
+        col1.metric(
+            "Total Predicted Volume",
+            f"{total_volume:,.0f}"
+        )
 
-    center_coords = [
-        40.7350,
-        -73.9850
-    ]
+        col2.metric(
+            "Average per Entry Point",
+            f"{avg_volume:,.0f}"
+        )
 
-else:
-
-    center_coords = [
-        40.7350,
-        -74.0000
-    ]
-
-
-m = folium.Map(
-    location=center_coords,
-    zoom_start=12,
-    tiles=tiles_dict[map_style],
-    attr="© OpenStreetMap contributors © CARTO",
-    prefer_canvas=True,
-    control_scale=True
-)
+        col3.metric(
+            "Highest Volume",
+            (
+                f"{busiest_row['group_name']} "
+                f"({busiest_row['predicted_volume_rounded']:,.0f})"
+            )
+        )
 
 
-# Broader bounds because some entry points extend to 60th St
-# and across the Hudson / East River.
+    # ============================================================
+    # MAP CONFIGURATION
+    # ============================================================
 
-m.fit_bounds(
-    [
-        [40.6950, -74.0250],
-        [40.7800, -73.9450]
-    ]
-)
+    tiles_dict = {
+        "OpenStreetMap": "OpenStreetMap",
 
-
-# ============================================================
-# ADD FORECAST LOCATIONS
-# ============================================================
-
-for _, row in current_forecast.iterrows():
-
-    group_id = int(
-        row["group_id"]
-    )
-
-    coords = GROUP_COORDS.get(
-        group_id
-    )
-
-    if coords is None:
-        continue
-
-
-    group_name = row[
-        "group_name"
-    ]
-
-    region_name = row[
-        "region_name"
-    ]
-
-    predicted_volume = row[
-        "predicted_volume_rounded"
-    ]
-
-
-    popup_html = f"""
-        <div style="width: 220px;">
-            <h4 style="margin-bottom: 5px;">
-                {group_name}
-            </h4>
-
-            <b>Region:</b>
-            {region_name}
-            <br>
-
-            <b>Forecast Time:</b>
-            {selected_timestamp.strftime("%I:%M %p")}
-            <br>
-
-            <b>Predicted Volume:</b>
-            {predicted_volume:,.0f} vehicles
-        </div>
-    """
-
-
-    tooltip = (
-        f"{group_name}: "
-        f"{predicted_volume:,.0f} vehicles"
-    )
-
-
-    folium.Marker(
-        location=coords,
-
-        popup=folium.Popup(
-            popup_html,
-            max_width=300
+        "Light Mode": (
+            "https://basemaps.cartocdn.com/"
+            "rastertiles/light_all/{z}/{x}/{y}.png"
+            f"?key={CARTO_API_KEY}"
         ),
 
-        tooltip=tooltip,
+        "Dark Mode": (
+            "https://basemaps.cartocdn.com/"
+            "rastertiles/dark_all/{z}/{x}/{y}.png"
+            f"?key={CARTO_API_KEY}"
+        )
+    }
 
-        icon=folium.Icon(
-            color="blue",
-            icon="info-sign"
+
+    if is_mobile:
+
+        center_coords = [
+            40.7350,
+            -73.9850
+        ]
+
+    else:
+
+        center_coords = [
+            40.7350,
+            -74.0000
+        ]
+
+
+    m = folium.Map(
+        location=center_coords,
+        zoom_start=12,
+        tiles=tiles_dict[map_style],
+        attr="© OpenStreetMap contributors © CARTO",
+        prefer_canvas=True,
+        control_scale=True
+    )
+
+
+    # Broader bounds because some entry points extend to 60th St
+    # and across the Hudson / East River.
+
+    m.fit_bounds(
+        [
+            [40.6950, -74.0250],
+            [40.7800, -73.9450]
+        ]
+    )
+
+
+    # ============================================================
+    # ADD FORECAST LOCATIONS
+    # ============================================================
+
+    for _, row in current_forecast.iterrows():
+
+        group_id = int(
+            row["group_id"]
         )
 
-    ).add_to(m)
+        coords = GROUP_COORDS.get(
+            group_id
+        )
+
+        if coords is None:
+            continue
 
 
-# ============================================================
-# DISPLAY MAP
-# ============================================================
+        group_name = row[
+            "group_name"
+        ]
 
-st_folium(
-    m,
-    width=1200,
-    height=600,
-    returned_objects=[]
-)
+        region_name = row[
+            "region_name"
+        ]
 
-
-# ============================================================
-# ENTRY POINT TABLE
-# ============================================================
-
-st.subheader(
-    "Entry Point Forecasts"
-)
-
-
-display_table = (
-    current_forecast[
-        [
-            "group_name",
-            "region_name",
+        predicted_volume = row[
             "predicted_volume_rounded"
         ]
-    ]
-    .rename(
-        columns={
-            "group_name":
-                "Entry Point",
 
-            "region_name":
-                "Region",
 
-            "predicted_volume_rounded":
-                "Predicted Volume"
-        }
+        popup_html = f"""
+            <div style="width: 220px;">
+                <h4 style="margin-bottom: 5px;">
+                    {group_name}
+                </h4>
+
+                <b>Region:</b>
+                {region_name}
+                <br>
+
+                <b>Forecast Time:</b>
+                {selected_timestamp.strftime("%I:%M %p")}
+                <br>
+
+                <b>Predicted Volume:</b>
+                {predicted_volume:,.0f} vehicles
+            </div>
+        """
+
+
+        tooltip = (
+            f"{group_name}: "
+            f"{predicted_volume:,.0f} vehicles"
+        )
+
+
+        folium.Marker(
+            location=coords,
+
+            popup=folium.Popup(
+                popup_html,
+                max_width=300
+            ),
+
+            tooltip=tooltip,
+
+            icon=folium.Icon(
+                color="blue",
+                icon="info-sign"
+            )
+
+        ).add_to(m)
+
+
+    # ============================================================
+    # DISPLAY MAP
+    # ============================================================
+
+    st_folium(
+        m,
+        width=1200,
+        height=600,
+        returned_objects=[]
     )
-    .sort_values(
-        "Predicted Volume",
-        ascending=False
+
+
+    # ============================================================
+    # ENTRY POINT TABLE
+    # ============================================================
+
+    st.subheader(
+        "Entry Point Forecasts"
     )
-)
 
 
-st.dataframe(
-    display_table,
-    hide_index=True,
-    use_container_width=True
-)
-
-
-# ============================================================
-# FULL DAY VIEW FOR ONE ENTRY POINT
-# ============================================================
-
-st.subheader(
-    "Daily Forecast by Entry Point"
-)
-
-
-group_options = list(
-    GROUP_MAPPING.keys()
-)
-
-
-selected_group_name = st.selectbox(
-    "Select Entry Point",
-    group_options
-)
-
-
-selected_group_id = GROUP_MAPPING[
-    selected_group_name
-]
-
-
-daily_group_forecast = (
-    forecast[
-        (forecast["forecast_date"] == selected_date)
-        &
-        (forecast["group_id"] == selected_group_id)
-    ]
-    .sort_values(
-        "toll_10_minute_block"
-    )
-)
-
-
-if not daily_group_forecast.empty:
-
-    chart_data = (
-        daily_group_forecast[
+    display_table = (
+        current_forecast[
             [
-                "toll_10_minute_block",
-                "predicted_volume"
+                "group_name",
+                "region_name",
+                "predicted_volume_rounded"
             ]
         ]
-        .set_index(
+        .rename(
+            columns={
+                "group_name":
+                    "Entry Point",
+
+                "region_name":
+                    "Region",
+
+                "predicted_volume_rounded":
+                    "Predicted Volume"
+            }
+        )
+        .sort_values(
+            "Predicted Volume",
+            ascending=False
+        )
+    )
+
+
+    st.dataframe(
+        display_table,
+        hide_index=True,
+        use_container_width=True
+    )
+
+
+    # ============================================================
+    # FULL DAY VIEW FOR ONE ENTRY POINT
+    # ============================================================
+
+    st.subheader(
+        "Daily Forecast by Entry Point"
+    )
+
+
+    group_options = list(
+        GROUP_MAPPING.keys()
+    )
+
+
+    selected_group_name = st.selectbox(
+        "Select Entry Point",
+        group_options,
+        accept_new_options=False
+    )
+
+
+    selected_group_id = GROUP_MAPPING[
+        selected_group_name
+    ]
+
+
+    daily_group_forecast = (
+        forecast[
+            (forecast["forecast_date"] == selected_date)
+            &
+            (forecast["group_id"] == selected_group_id)
+        ]
+        .sort_values(
             "toll_10_minute_block"
         )
     )
 
-    st.line_chart(
-        chart_data
+
+    if not daily_group_forecast.empty:
+
+        chart_data = (
+            daily_group_forecast[
+                [
+                    "toll_10_minute_block",
+                    "predicted_volume"
+                ]
+            ]
+            .set_index(
+                "toll_10_minute_block"
+            )
+        )
+
+        st.line_chart(
+            chart_data
+        )
+
+# ============================================================
+# MODEL PERFORMANCE TAB
+# ============================================================
+
+with performance_tab:
+
+    st.header(
+        "Forecast Performance"
     )
 
+    # --------------------------
+    # Select forecast version
+    # --------------------------
+
+    available_forecasts = sorted(
+        evaluation[
+            'forecast_generated_date_display'
+        ].unique()
+    )
+
+    selected_forecast = st.selectbox(
+        "Forecast Date",
+        available_forecasts,
+        accept_new_options=False
+    )
+
+    # Filter evaluation data to selected forecast
+    evaluation_filtered = evaluation[
+        evaluation[
+            'forecast_generated_date_display'
+        ] == selected_forecast
+    ].copy()
+
+    # Filter group performance to selected forecast
+    group_performance_filtered = group_performance[
+        group_performance[
+            'forecast_generated_date_display'
+        ] == selected_forecast
+    ].copy()
+
+
+    # ========================================================
+    # HEADLINE PERFORMANCE METRICS
+    # ========================================================
+
+    overall_mae = (
+        evaluation_filtered[
+            'absolute_error'
+        ].mean()
+    )
+
+    average_bias = (
+        evaluation_filtered[
+            'error'
+        ].mean()
+    )
+
+    best_group = (
+        group_performance_filtered.loc[
+            group_performance_filtered[
+                'mae'
+            ].idxmin()
+        ]
+    )
+
+    worst_group = (
+        group_performance_filtered.loc[
+            group_performance_filtered[
+                'mae'
+            ].idxmax()
+        ]
+    )
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric(
+        "Mean Absolute Error",
+        f"{overall_mae:.1f} vehicles"
+    )
+
+    col2.metric(
+        "Average Bias",
+        f"{average_bias:+.1f} vehicles"
+    )
+
+    col3.metric(
+        "Best Predicted",
+        GROUP_NAME_BY_ID[
+            int(best_group['group_id'])
+        ],
+        f"MAE {best_group['mae']:.1f}"
+    )
+
+    col4.metric(
+        "Worst Predicted",
+        GROUP_NAME_BY_ID[
+            int(worst_group['group_id'])
+        ],
+        f"MAE {worst_group['mae']:.1f}"
+    )
+
+
+    # ========================================================
+    # ACTUAL VS PREDICTED
+    # ========================================================
+
+    st.subheader(
+        "Actual vs Predicted Traffic"
+    )
+
+    evaluation_group = st.selectbox(
+        "Entry Point",
+        list(GROUP_MAPPING.keys()),
+        key="evaluation_group",
+        accept_new_options=False
+    )
+
+    evaluation_group_id = (
+        GROUP_MAPPING[
+            evaluation_group
+        ]
+    )
+
+    group_evaluation = evaluation_filtered[
+        evaluation_filtered[
+            'group_id'
+        ] == evaluation_group_id
+    ].copy()
+
+    comparison_chart = (
+        group_evaluation[
+            [
+                'toll_10_minute_block',
+                'predicted_volume',
+                'actual_volume'
+            ]
+        ]
+        .set_index(
+            'toll_10_minute_block'
+        )
+    )
+
+    st.line_chart(
+        comparison_chart,
+        x_label="Time",
+        y_label="Traffic Volume"
+    )
+
+
+    # ========================================================
+    # MAE BY ENTRY POINT
+    # ========================================================
+
+    st.subheader(
+        "Average Error by Entry Point"
+    )
+
+    mae_pct_chart_data = (
+        group_performance_filtered[
+            [
+                "group_name",
+                "mae",
+                "mae_pct_of_mean"
+            ]
+        ]
+        .sort_values(
+            "mae_pct_of_mean"
+        )
+    )
+
+    mae_pct_chart = (
+        alt.Chart(mae_pct_chart_data)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "group_name:N",
+                sort=alt.EncodingSortField(
+                    field="mae_pct_of_mean",
+                    order="ascending"
+                ),
+                title="Entry Point"
+            ),
+            y=alt.Y(
+                "mae_pct_of_mean:Q",
+                title="Mean Absolute Error (%)"
+            ),
+            tooltip=[
+                alt.Tooltip(
+                    "group_name:N",
+                    title="Entry Point"
+                ),
+                alt.Tooltip(
+                    "mae_pct_of_mean:Q",
+                    title="MAE (%)",
+                    format=".1f"
+                ),
+                alt.Tooltip(
+                    "mae:Q",
+                    title="MAE (vehicles)",
+                    format=".1f"
+                )
+            ]
+        )
+    )
+
+    st.altair_chart(
+        mae_pct_chart,
+        use_container_width=True
+    )
+
+    # st.bar_chart(
+    #     mae_chart,
+    #     x_label="Entry Point",
+    #     y_label="Mean Absolute Error Percentage (MAE%)"
+    # )
+
+
+    # ========================================================
+    # FORECAST HORIZON
+    # ========================================================
+
+    st.subheader(
+        "Accuracy by Forecast Horizon"
+    )
+
+    evaluation_filtered[
+        'horizon_day'
+    ] = (
+        evaluation_filtered[
+            'forecast_horizon_days'
+        ]
+        .apply(np.ceil)
+        .astype(int)
+    )
+
+    horizon_performance = (
+        evaluation_filtered
+        .groupby(
+            'horizon_day',
+            as_index=False
+        )
+        .agg(
+            mae=(
+                'absolute_error',
+                'mean'
+            )
+        )
+    )
+
+    st.line_chart(
+        horizon_performance,
+        x='horizon_day',
+        y='mae',
+        x_label="Days Ahead",
+        y_label="Mean Absolute Error"
+    )
 
 # ============================================================
 # ABOUT
