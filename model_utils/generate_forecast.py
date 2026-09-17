@@ -462,7 +462,7 @@ def run_forecast_generation(
                     "predicted_volume":
                         predicted_volume,
 
-                    "Predicted Volume Rounded":
+                    "predicted_volume_rounded":
                         round_half_up(
                             predicted_volume
                         )
