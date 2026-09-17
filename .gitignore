@@ -1,5 +1,8 @@
 *.csv
 !data/forecasts/traffic_forecast.csv
+!data/forecast_evaluations/evaluation_by_group.csv
+!data/forecast_evaluations/evaluation_summary.csv
+!data/forecast_actual_comparison.csv
 
 *.xlsx
 
