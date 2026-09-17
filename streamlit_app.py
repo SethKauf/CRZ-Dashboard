@@ -81,7 +81,7 @@ GROUP_COORDS = {
 def load_forecast_data():
 
     df = pd.read_csv(
-        "data/forecasts/traffic_forecast.csv"
+        FORECAST_PATH
     )
 
     df["toll_10_minute_block"] = pd.to_datetime(
