@@ -1,4 +1,5 @@
 import json
+import os
 import pandas as pd
 import requests
 
@@ -46,6 +47,12 @@ def check_for_new_data():
 
     # 3. Compare timestamps
     new_data_available = source_timestamp > trained_timestamp
+
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    
+    if github_output:
+        with open(github_output, "a") as f:
+            f.write(f"new_data_available={str(new_data_available).lower()}\n")
 
     # 4. Print results
     print(f"Latest source timestamp: {source_timestamp}")

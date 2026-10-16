@@ -7,13 +7,25 @@ on:
 
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: crz-data-pipeline
+  cancel-in-progress: false
+
 jobs:
   check-data:
     runs-on: ubuntu-latest
 
+    outputs:
+      new_data_available: ${{ steps.check.outputs.new_data_available }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -21,7 +33,17 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests pandas
 
       - name: Check NY Open Data
+        id: check
         run: python -m pipelines.check_for_new_data
+
+  update-model:
+    needs: check-data
+    if: needs.check-data.outputs.new_data_available == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Confirm pipeline trigger
+        run: echo "New data detected. Model update is required."

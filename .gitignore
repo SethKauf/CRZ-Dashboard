@@ -1,18 +1,29 @@
+# Ignore CSV files by default
 *.csv
+
+# Historical modeling dataset (tracked with Git LFS)
+!data/modeling_data.csv
+
+# Current forecast displayed in Streamlit
 !data/forecasts/traffic_forecast.csv
+
+# Forecast evaluation files
 !data/forecast_evaluations/evaluation_by_group.csv
 !data/forecast_evaluations/evaluation_summary.csv
 !data/forecast_evaluations/forecast_actual_comparison.csv
-
 *.xlsx
 
 *.parquet
 
 .env
 
+# Ignore model and scaler files by default
 *.keras
-
 *.joblib
+
+# Track only the active model and scaler
+!models/lstm_traffic_model.keras
+!models/traffic_scaler.joblib
 
 .streamlit/secrets.toml
 
