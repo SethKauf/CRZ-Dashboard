@@ -47,7 +47,7 @@ jobs:
 
   update-model:
     needs: check-data
-    if: ${{ needs.check-data.outputs.new_data_available == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force_update_test == true) }}
+    if: needs.check-data.outputs.new_data_available == 'true'
     runs-on: ubuntu-latest
 
     steps:
