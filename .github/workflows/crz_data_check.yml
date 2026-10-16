@@ -1,0 +1,27 @@
+name: CRZ Data Check
+
+on:
+    schedule:
+        -   cron: "0 12 * * 2,4,6" # runs at 12:00 EST on Tuesday, Thursday, and Saturday"
+            timezone: "America/New_York"
+
+    workflow_dispatch:
+
+jobs:
+    check-data:
+        runs-on: ubuntu-latest
+        
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v4
+
+            -   name: Set up Python
+                uses: actions/setup-python@v5
+                with:
+                    python-version: "3.11"
+
+            -   name: Install dependencies
+                run: pip install requests
+
+            -   name: Check NY Open Data
+                run: python -m pipelines.check_for_new_data
