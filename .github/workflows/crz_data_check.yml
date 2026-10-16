@@ -6,12 +6,6 @@ on:
       timezone: "America/New_York"
 
   workflow_dispatch:
-    inputs:
-      force_update_test:
-        description: "Test the true branch (without retraining)"
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -50,6 +44,44 @@ jobs:
     if: needs.check-data.outputs.new_data_available == 'true'
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
-      - name: Confirm pipeline trigger
-        run: echo "New data detected. Model update is required."
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run CRZ update pipeline
+        run: python -m pipelines.update_pipeline
+
+      - name: Commit updated model and forecasts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            data/modeling_data.csv \
+            models/lstm_traffic_model.keras \
+            models/traffic_scaler.joblib \
+            src/model_config.json \
+            data/forecasts/traffic_forecast.csv
+
+          git add -u data/forecast_evaluations/
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Automated CRZ model and forecast update"
+            git push origin HEAD:main
+          fi
