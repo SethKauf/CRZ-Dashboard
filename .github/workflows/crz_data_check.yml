@@ -6,6 +6,12 @@ on:
       timezone: "America/New_York"
 
   workflow_dispatch:
+    inputs:
+      force_update_test:
+        description: "Test the true branch (without retraining)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -41,7 +47,7 @@ jobs:
 
   update-model:
     needs: check-data
-    if: needs.check-data.outputs.new_data_available == 'true'
+    if: ${{ needs.check-data.outputs.new_data_available == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force_update_test == true) }}
     runs-on: ubuntu-latest
 
     steps:
