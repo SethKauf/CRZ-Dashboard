@@ -85,3 +85,12 @@ jobs:
             git commit -m "Automated CRZ model and forecast update"
             git push origin HEAD:main
           fi
+
+      - name: Upload raw API pull
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crz-api-pull
+          path: data/api_pull_data/*.csv
+          if-no-files-found: ignore
+          retention-days: 30

@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from src.fetch_data import fetch_traffic_data, process_data
 
@@ -59,6 +60,11 @@ def run_prepare_data(
     api_pull_path = (
         f"data/api_pull_data/"
         f"crz_data_pull_{todays_date}.csv"
+    )
+
+    # create directory if it doesn't exist (GitHub Actions)
+    Path(api_pull_path).parent.mkdir(
+        parents=True, exist_ok=True
     )
 
     new_data.to_csv(
