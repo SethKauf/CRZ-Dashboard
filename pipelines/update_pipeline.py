@@ -51,33 +51,40 @@ def main():
 
     evaluation_result = run_forecast_evaluation()
 
-    evaluation_summary = evaluation_result["summary"].copy()
+    if evaluation_result.get("new_rows", 0) == 0:
+        print(
+            "\nNo new forecast/actual comparisons available. "
+            "Skipping evaluation metrics."
+        )
 
-    evaluation_summary["forecast_generated_date_dt"] = pd.to_datetime(
-        evaluation_summary["forecast_generated_date"].astype(str),
-        format="%Y%m%d"
-    )
+    else:
+        evaluation_summary = evaluation_result["summary"].copy()
 
-    most_recent_evaluation = (
-        evaluation_summary
-        .sort_values("forecast_generated_date_dt")
-        .iloc[-1]
-    )
+        evaluation_summary["forecast_generated_date_dt"] = pd.to_datetime(
+            evaluation_summary["forecast_generated_date"].astype(str),
+            format="%Y%m%d"
+        )
 
-    forecast_date = (
-        most_recent_evaluation["forecast_generated_date_dt"]
-        .strftime("%Y-%b-%d")
-    )
+        most_recent_evaluation = (
+            evaluation_summary
+            .sort_values("forecast_generated_date_dt")
+            .iloc[-1]
+        )
 
-    overall_mae = most_recent_evaluation["overall_mae"]
-    mae_pct = most_recent_evaluation["mae_pct_of_mean"]
+        forecast_date = (
+            most_recent_evaluation["forecast_generated_date_dt"]
+            .strftime("%Y-%b-%d")
+        )
 
-    print(
-        "\nEvaluation completed. "
-        f"Average overall MAE of previous forecast "
-        f"({forecast_date}) was {overall_mae:.1f} vehicles "
-        f"({mae_pct:.1f}% of mean traffic volume)."
-    )
+        overall_mae = most_recent_evaluation["overall_mae"]
+        mae_pct = most_recent_evaluation["mae_pct_of_mean"]
+
+        print(
+            "\nEvaluation completed. "
+            f"Average overall MAE of previous forecast "
+            f"({forecast_date}) was {overall_mae:.1f} vehicles "
+            f"({mae_pct:.1f}% of mean traffic volume)."
+        )
 
     print("\n========================================")
     print("PIPELINE COMPLETE")
