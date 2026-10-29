@@ -650,7 +650,12 @@ with performance_tab:
     available_forecasts = sorted(
         evaluation[
             'forecast_generated_date_display'
-        ].unique()
+        ].unique(),
+        key=lambda date: pd.to_datetime(
+            date,
+            format="%Y-%b-%d"
+        ),
+        reverse=True
     )
 
     selected_forecast = st.selectbox(
