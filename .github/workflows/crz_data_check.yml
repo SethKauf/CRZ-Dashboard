@@ -77,7 +77,8 @@ jobs:
             src/model_config.json \
             data/forecasts/traffic_forecast.csv
 
-          git add -u data/forecast_evaluations/
+          git add data/forecasts/archive/
+          git add -A data/forecast_evaluations/
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
@@ -94,3 +95,51 @@ jobs:
           path: data/api_pull_data/*.csv
           if-no-files-found: ignore
           retention-days: 30
+          
+  evaluate-forecasts:
+    needs: [check-data, update-model]
+    if: |
+      always() &&
+      needs.check-data.result == 'success' &&
+      (
+        needs.update-model.result == 'success' ||
+        needs.update-model.result == 'skipped'
+      )
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          lfs: true
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install evaluation dependencies
+        run: pip install pandas numpy
+
+      - name: Evaluate historical forecasts
+        run: python -m model_utils.evaluate_forecasts
+
+      - name: Commit evaluation results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A data/forecast_evaluations/
+
+          if git diff --cached --quiet; then
+            echo "No evaluation changes to commit."
+          else
+            git commit -m "Update CRZ forecast evaluations"
+            git push origin HEAD:main
+          fi

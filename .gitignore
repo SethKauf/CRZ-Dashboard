@@ -7,6 +7,10 @@
 # Current forecast displayed in Streamlit
 !data/forecasts/traffic_forecast.csv
 
+# Preserve historical forecasts for model evaluation
+!data/forecasts/archive
+!data/forecasts/archive/*.csv
+
 # Forecast evaluation files
 !data/forecast_evaluations/evaluation_by_group.csv
 !data/forecast_evaluations/evaluation_summary.csv
