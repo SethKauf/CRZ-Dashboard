@@ -2,7 +2,7 @@ name: CRZ Data Check
 
 on:
   schedule:
-    - cron: "0 12 * * 2,4,6"
+    - cron: "0 19 * * 2,4,6"
       timezone: "America/New_York"
 
   workflow_dispatch:
@@ -95,7 +95,7 @@ jobs:
           path: data/api_pull_data/*.csv
           if-no-files-found: ignore
           retention-days: 30
-          
+
   evaluate-forecasts:
     needs: [check-data, update-model]
     if: |
